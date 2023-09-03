@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = false
+name = "pip_conf_index_global"
+
+[packages]
+django = ">=4.2"
+
+[dev-packages]
+invoke = "*"
+twine = "*"
+"zest.releaser" = "*"
+coverage = "==4.4.1"
+mock = ">=1.0.1"
+flake8 = ">=2.1.0"
+tox = ">=1.7.0"
+codecov = ">=2.0.0"
+mypy = "*"
+django-stubs = {extras = ["compatible-mypy"], version = "*"}
+django-stubs-ext = "*"
+black = "*"
+vistir = "==0.6.1"
+pipenv-setup = {extras = ["black"], version = "*"}
+pre-commit = "*"
+
+[requires]
+python_version = "3.11"

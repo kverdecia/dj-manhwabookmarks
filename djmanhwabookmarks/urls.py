@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-from django.conf.urls import url
+from django.urls import path
 from django.views.generic import TemplateView
 
-from . import views
+from . import views  # noqa F401
 
 
 app_name = 'djmanhwabookmarks'
 urlpatterns = [
-    url(r'', TemplateView.as_view(template_name="base.html")),
-    ]
+    path('', TemplateView.as_view(template_name="base.html")),
+]
