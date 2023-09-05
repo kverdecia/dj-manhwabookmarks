@@ -11,6 +11,7 @@ from django.template.loader import render_to_string
 from django_htmx.http import trigger_client_event
 
 from . import models
+from . import forms
 
 
 @admin.register(models.ManhwaBookmark)
@@ -22,7 +23,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         ]
 
     actions = ('update_bookmark',)
-    list_display = ('name', 'get_url', 'get_chapter_number', 'get_next_chapter')
+    list_display = ('get_name', 'get_url', 'get_chapter_number', 'get_next_chapter')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url')
     fieldsets = (
         (None, {
@@ -38,6 +39,11 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
             'fields': ('next_chapter_url', 'next_chapter_url_selector', 'next_chapter_opened')
         }),
     )
+    form = forms.BookmarkForm
+
+    @admin.display(description=_('Name'))
+    def get_name(self, obj: models.ManhwaBookmark) -> str:
+        return str(obj)
 
     @admin.display(description=_('Url'))
     def get_url(self, obj: models.ManhwaBookmark) -> str | None:
