@@ -22,7 +22,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
             'js/djmanhwabookmarks.js',
         ]
 
-    actions = ('update_bookmark',)
+    actions = ('update_bookmarks',)
     list_display = ('get_name', 'get_url', 'get_chapter_number', 'is_template', 'get_next_chapter')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url')
     fieldsets = (
@@ -69,10 +69,9 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         context = {'bookmark': obj}
         return render_to_string('djmanhwabookmarks/bookmark_actions.html', context)
 
-    @admin.action(description=_('Update bookmark'))
-    def update_bookmark(self, request, queryset):
-        for bookmark in queryset:
-            bookmark.update_bookmark()
+    @admin.action(description=_('Update bookmarks'))
+    def update_bookmarks(self, request, queryset):
+        queryset.update_bookmarks()
         self.message_user(request, gettext('Bookmarks updated'))
 
     def get_urls(self):
