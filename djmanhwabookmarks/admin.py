@@ -1,14 +1,26 @@
 # -*- coding: utf-8 -*-
+from django.urls import path
 from django.utils.translation import gettext_lazy as _, gettext
+from django.shortcuts import get_object_or_404, render
+from django.http import HttpResponse
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
+from django.template.loader import render_to_string
+
+from django_htmx.http import trigger_client_event
 
 from . import models
 
 
 @admin.register(models.ManhwaBookmark)
 class ManhwaBookmarkAdmin(admin.ModelAdmin):
+    class Media:
+        js = [
+            'https://unpkg.com/htmx.org@1.9.5',
+            'js/djmanhwabookmarks.js',
+        ]
+
     actions = ('update_bookmark',)
     list_display = ('name', 'get_url', 'get_chapter_number', 'get_next_chapter')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url')
@@ -45,13 +57,56 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
 
     @admin.display(description=_('Next chapter'))
     def get_next_chapter(self, obj: models.ManhwaBookmark) -> str | None:
-        if not obj.next_chapter_url:
-            return None
-        msg = gettext('Next chapter')
-        return format_html('<a href="{}" target="__blank">{}</a>', obj.next_chapter_url, msg)
+        context = {'bookmark': obj}
+        return render_to_string('djmanhwabookmarks/bookmark_actions.html', context)
 
     @admin.action(description=_('Update bookmark'))
     def update_bookmark(self, request, queryset):
         for bookmark in queryset:
             bookmark.update_bookmark()
         self.message_user(request, gettext('Bookmarks updated'))
+
+    def get_urls(self):
+        url = super().get_urls()
+        custom_urls = [
+            path(
+                '<int:bookmark_id>/bookmark-actions/',
+                self.admin_site.admin_view(self.bookmark_actions),
+                name='bookmark-actions'
+            ),
+            path(
+                '<int:bookmark_id>/view-next-chapter/',
+                self.admin_site.admin_view(self.view_next_chapter),
+                name='view-bookmark-next-chapter'
+            ),
+            path(
+                '<int:bookmark_id>/change-to-next-chapter/',
+                self.admin_site.admin_view(self.change_to_next_chapter),
+                name='change-bookmark-to-next-chapter'
+            ),
+        ]
+        return custom_urls + url
+
+    def render_bookmark_actions_response(self, request, bookmark: models.ManhwaBookmark) -> HttpResponse:
+        context = {'bookmark': bookmark}
+        return render(request, 'djmanhwabookmarks/bookmark_actions_response.html', context)
+
+    def bookmark_actions(self, request, bookmark_id, *args, **kwargs):
+        bookmark = get_object_or_404(models.ManhwaBookmark, pk=bookmark_id)
+        return self.render_bookmark_actions_response(request, bookmark)
+
+    def view_next_chapter(self, request, bookmark_id, *args, **kwargs):
+        bookmark = get_object_or_404(models.ManhwaBookmark, pk=bookmark_id)
+        bookmark.mark_next_chapter_opened()
+        response = self.render_bookmark_actions_response(request, bookmark)
+        trigger_client_event(
+            response,
+            'openNextChapterUrl',
+            {'next_chapter_url': bookmark.next_chapter_url},
+            after='swap')
+        return response
+
+    def change_to_next_chapter(self, request, bookmark_id, *args, **kwargs):
+        bookmark = get_object_or_404(models.ManhwaBookmark, pk=bookmark_id)
+        bookmark.change_to_next_chapter()
+        return self.render_bookmark_actions_response(request, bookmark)

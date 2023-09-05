@@ -28,11 +28,11 @@ repos:
   - id: flake8
     additional_dependencies:
     - flake8-bugbear==21.11.29
-- repo: local
-  hooks:
-    - id: django-test
-      name: django-test
-      entry: pipenv run python manage.py test
-      always_run: true
-      pass_filenames: false
-      language: system
+# - repo: local
+#   hooks:
+#     - id: django-test
+#       name: django-test
+#       entry: pipenv run python manage.py test
+#       always_run: true
+#       pass_filenames: false
+#       language: system

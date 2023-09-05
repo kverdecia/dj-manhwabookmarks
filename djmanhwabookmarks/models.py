@@ -121,3 +121,16 @@ class ManhwaBookmark(models.Model):
         page = self._get_page(browser)
         self.title = self._get_selector_content(page, self.title_selector)
         self.description = self._get_selector_content(page, self.description_selector)
+
+    def mark_next_chapter_opened(self):
+        if self.next_chapter_url:
+            self.next_chapter_opened = True
+            self.save()
+
+    def change_to_next_chapter(self) -> None:
+        if self.next_chapter_url:
+            self.chapter_url = self.next_chapter_url
+            self.next_chapter_url = None
+            self.next_chapter_opened = False
+            self.update_bookmark(save=False)
+            self.save()

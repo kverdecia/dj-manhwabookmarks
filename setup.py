@@ -76,7 +76,7 @@ setup(
     ],
     python_requires=">=3.11",
     include_package_data=True,
-    install_requires=["django>=4.2", "mechanicalsoup"],
+    install_requires=["django>=4.2", "mechanicalsoup", "django-htmx"],
     license="MIT",
     zip_safe=False,
     keywords="dj-manhwabookmarks",

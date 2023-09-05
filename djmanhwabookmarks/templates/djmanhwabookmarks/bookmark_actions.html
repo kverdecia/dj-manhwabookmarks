@@ -1,0 +1,8 @@
+<div id="bookmark-{{bookmark.pk}}-actions">
+{% if bookmark.next_chapter_url %}
+    <a class="button" hx-post="{% url 'admin:view-bookmark-next-chapter' bookmark.pk %}">View next chapter</a>
+{% endif %}
+{% if bookmark.next_chapter_opened %}
+    <a class="button" hx-post="{% url 'admin:change-bookmark-to-next-chapter' bookmark.pk %}">Change to next chapter</a>
+{% endif %}
+</div>
