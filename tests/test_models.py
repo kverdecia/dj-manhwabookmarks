@@ -10,7 +10,7 @@ Tests for `dj-manhwabookmarks` models module.
 
 from django.test import TestCase
 
-from djmanhwabookmarks import models
+from djmanhwabookmarks import models  # noqa F401
 
 
 class TestDjmanhwabookmarks(TestCase):
