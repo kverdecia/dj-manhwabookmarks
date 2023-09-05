@@ -9,6 +9,7 @@ from . import models
 
 @admin.register(models.ManhwaBookmark)
 class ManhwaBookmarkAdmin(admin.ModelAdmin):
+    actions = ('update_bookmark',)
     list_display = ('name', 'get_url', 'get_chapter_number', 'get_next_chapter')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url')
     fieldsets = (
@@ -48,3 +49,9 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
             return None
         msg = gettext('Next chapter')
         return format_html('<a href="{}" target="__blank">{}</a>', obj.next_chapter_url, msg)
+
+    @admin.action(description=_('Update bookmark'))
+    def update_bookmark(self, request, queryset):
+        for bookmark in queryset:
+            bookmark.update_bookmark()
+        self.message_user(request, gettext('Bookmarks updated'))
