@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from typing import cast
 import re
+from urllib.parse import urljoin
 
 from django.utils.translation import gettext_lazy as _
 from django.db import models
@@ -67,7 +68,9 @@ class ManhwaBookmark(models.Model):
     def _get_page(self, browser: mechanicalsoup.StatefulBrowser) -> bs4.BeautifulSoup:
         return cast(bs4.BeautifulSoup, browser.page)
 
-    def _get_selector_tag(self, page: bs4.BeautifulSoup, selector: str) -> bs4.Tag | None:
+    def _get_selector_tag(self, page: bs4.BeautifulSoup, selector: str | None) -> bs4.Tag | None:
+        if not selector:
+            return None
         tag = page.select_one(selector)
         if not tag:
             return None
@@ -77,9 +80,14 @@ class ManhwaBookmark(models.Model):
         tag = self._get_selector_tag(page, selector)
         if not tag:
             return None
-        return tag.get_text()
+        return tag.get_text().strip()
 
     def _get_selector_link(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
+        def absolute_url(url: str) -> str:
+            if url.startswith('/'):
+                return urljoin(self.chapter_url, url)
+            return url
+
         tag = self._get_selector_tag(page, selector)
         if not tag:
             return None
@@ -87,8 +95,8 @@ class ManhwaBookmark(models.Model):
             return None
         result = tag['href']
         if isinstance(result, str):
-            return result
-        return result[0]
+            return absolute_url(result)
+        return absolute_url(result[0])
 
     def _get_chapter_number(self, page: bs4.BeautifulSoup) -> int | None:
         number_str = self._get_selector_content(page, self.chapter_number_selector)
@@ -98,6 +106,8 @@ class ManhwaBookmark(models.Model):
             return int(number_str)
         except ValueError:
             ...
+        if not self.chapter_number_regex:
+            return None
         found = re.findall(self.chapter_number_regex, number_str)
         if not found:
             return None
@@ -119,8 +129,8 @@ class ManhwaBookmark(models.Model):
         if browser is None:
             return
         page = self._get_page(browser)
-        self.title = self._get_selector_content(page, self.title_selector)
-        self.description = self._get_selector_content(page, self.description_selector)
+        self.title = self._get_selector_content(page, self.title_selector) or ''
+        self.description = self._get_selector_content(page, self.description_selector) or ''
 
     def mark_next_chapter_opened(self):
         if self.next_chapter_url:
