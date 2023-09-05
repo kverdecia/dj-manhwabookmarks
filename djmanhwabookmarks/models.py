@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
+from typing import cast
+import re
+
 from django.utils.translation import gettext_lazy as _
 from django.db import models
+
+import bs4
+import mechanicalsoup
 
 from . import validators
 
@@ -38,3 +44,80 @@ class ManhwaBookmark(models.Model):
 
     def __str__(self):
         return self.title or self.name
+
+    def update_bookmark(self, save=True):
+        self.update_chapter()
+        self.update_bookmark_url()
+        self.update_main_page()
+        if save:
+            self.save()
+
+    def open_chapter(self) -> mechanicalsoup.StatefulBrowser:
+        browser = mechanicalsoup.StatefulBrowser()
+        browser.open(self.chapter_url)
+        return browser
+
+    def open_main_page(self) -> mechanicalsoup.StatefulBrowser | None:
+        if not self.url:
+            return None
+        browser = mechanicalsoup.StatefulBrowser()
+        browser.open(self.url)
+        return browser
+
+    def _get_page(self, browser: mechanicalsoup.StatefulBrowser) -> bs4.BeautifulSoup:
+        return cast(bs4.BeautifulSoup, browser.page)
+
+    def _get_selector_tag(self, page: bs4.BeautifulSoup, selector: str) -> bs4.Tag | None:
+        tag = page.select_one(selector)
+        if not tag:
+            return None
+        return tag
+
+    def _get_selector_content(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
+        tag = self._get_selector_tag(page, selector)
+        if not tag:
+            return None
+        return tag.get_text()
+
+    def _get_selector_link(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
+        tag = self._get_selector_tag(page, selector)
+        if not tag:
+            return None
+        if tag.name != "a":
+            return None
+        result = tag['href']
+        if isinstance(result, str):
+            return result
+        return result[0]
+
+    def _get_chapter_number(self, page: bs4.BeautifulSoup) -> int | None:
+        number_str = self._get_selector_content(page, self.chapter_number_selector)
+        if not number_str:
+            return None
+        try:
+            return int(number_str)
+        except ValueError:
+            ...
+        found = re.findall(self.chapter_number_regex, number_str)
+        if not found:
+            return None
+        return int(found[0])
+
+    def update_chapter(self):
+        browser = self.open_chapter()
+        page = self._get_page(browser)
+        self.chapter_number = self._get_chapter_number(page)
+        self.next_chapter_url = self._get_selector_link(page, self.next_chapter_url_selector)
+
+    def update_bookmark_url(self):
+        browser = self.open_chapter()
+        page = self._get_page(browser)
+        self.url = self._get_selector_link(page, self.url_selector)
+
+    def update_main_page(self):
+        browser = self.open_main_page()
+        if browser is None:
+            return
+        page = self._get_page(browser)
+        self.title = self._get_selector_content(page, self.title_selector)
+        self.description = self._get_selector_content(page, self.description_selector)
