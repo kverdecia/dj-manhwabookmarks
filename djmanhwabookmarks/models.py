@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-from typing import cast
+from typing import cast, Optional
 import re
 from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 from django.utils.translation import gettext_lazy as _
 from django.db import models
@@ -28,7 +29,7 @@ class ManhwaBookmark(models.Model):
         validators=[validators.validate_selector_syntax])
 
     chapter_url = models.URLField(_("Chapter url"), unique=True)
-    chapter_number = models.PositiveIntegerField(_("Chapter number"), blank=True, null=True, editable=False)
+    chapter_number = models.FloatField(_("Chapter number"), blank=True, null=True, editable=False)
     chapter_number_selector = models.CharField(max_length=255, blank=True,
         validators=[validators.validate_selector_syntax])
     chapter_number_regex = models.CharField(max_length=255, blank=True,
@@ -39,12 +40,41 @@ class ManhwaBookmark(models.Model):
         validators=[validators.validate_selector_syntax])
     next_chapter_opened = models.BooleanField(_("Next chapter opened"), default=False)
 
+    is_template = models.BooleanField(_("Is template"), default=False)
+
     class Meta:
         verbose_name = _("Manhwa bookmark")
         verbose_name_plural = _("Manhwa bookmarks")
 
     def __str__(self):
         return self.title or self.name
+
+    def save(self, *args, **kwargs):
+        if self.pk is None and not self.is_template:
+            self.copy_template_fields_if_empty()
+        super().save(*args, **kwargs)
+
+    def copy_template_fields_if_empty(self):
+        template = self.get_available_template()
+        if template is not None:
+            if not self.url_selector:
+                self.url_selector = template.url_selector
+            if not self.title_selector:
+                self.title_selector = template.title_selector
+            if not self.description_selector:
+                self.description_selector = template.description_selector
+            if not self.chapter_number_selector:
+                self.chapter_number_selector = template.chapter_number_selector
+            if not self.chapter_number_regex:
+                self.chapter_number_regex = template.chapter_number_regex
+            if not self.next_chapter_url_selector:
+                self.next_chapter_url_selector = template.next_chapter_url_selector
+
+    def get_available_template(self) -> Optional['ManhwaBookmark']:
+        parse_result = urlparse(self.chapter_url)
+        parse_result = parse_result._replace(path='', query='', fragment='', params='')
+        template_url = parse_result.geturl()
+        return ManhwaBookmark.objects.filter(chapter_url__startswith=template_url, is_template=True).first()
 
     def update_bookmark(self, save=True):
         self.update_chapter()
@@ -98,12 +128,12 @@ class ManhwaBookmark(models.Model):
             return absolute_url(result)
         return absolute_url(result[0])
 
-    def _get_chapter_number(self, page: bs4.BeautifulSoup) -> int | None:
+    def _get_chapter_number(self, page: bs4.BeautifulSoup) -> float | None:
         number_str = self._get_selector_content(page, self.chapter_number_selector)
         if not number_str:
             return None
         try:
-            return int(number_str)
+            return float(number_str)
         except ValueError:
             ...
         if not self.chapter_number_regex:
@@ -111,7 +141,7 @@ class ManhwaBookmark(models.Model):
         found = re.findall(self.chapter_number_regex, number_str)
         if not found:
             return None
-        return int(found[0])
+        return float(found[0])
 
     def update_chapter(self):
         browser = self.open_chapter()

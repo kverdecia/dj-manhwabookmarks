@@ -23,7 +23,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         ]
 
     actions = ('update_bookmark',)
-    list_display = ('get_name', 'get_url', 'get_chapter_number', 'get_next_chapter')
+    list_display = ('get_name', 'get_url', 'get_chapter_number', 'is_template', 'get_next_chapter')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url')
     fieldsets = (
         (None, {
@@ -37,6 +37,9 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         }),
         (_('Next chapter'), {
             'fields': ('next_chapter_url', 'next_chapter_url_selector', 'next_chapter_opened')
+        }),
+        (_('Template'), {
+            'fields': ('is_template',)
         }),
     )
     form = forms.BookmarkForm
