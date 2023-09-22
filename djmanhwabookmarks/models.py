@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from typing import cast, Optional
 import re
-from urllib.parse import urljoin
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.utils.translation import gettext_lazy as _
 from django.db import models
@@ -13,7 +13,26 @@ import mechanicalsoup
 from . import validators
 
 
+class ManhwaBookmarkQueryset(models.QuerySet['ManhwaBookmark']):
+    def update_bookmarks(self) -> None:
+        count = self.count()
+        with ThreadPoolExecutor(10) as executor:
+            futures = (executor.submit(bookmark.update_bookmark) for bookmark in self.all())
+            for pos, future in enumerate(as_completed(futures)):  # noqa: B007
+                print(f'{pos + 1}/{count}')
+
+
+class ManhwaBookmarkManager(models.Manager):
+    def get_queryset(self):
+        return ManhwaBookmarkQueryset(self.model, using=self._db)
+
+    def update_bookmarks(self):
+        return self.get_queryset().update_bookmarks()
+
+
 class ManhwaBookmark(models.Model):
+    objects = ManhwaBookmarkManager()
+
     name = models.CharField(_("Name"), max_length=255, unique=True)
 
     url = models.URLField(_("Url"), blank=True, null=True, unique=True, editable=False)
