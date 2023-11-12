@@ -59,6 +59,11 @@ class ManhwaBookmark(models.Model):
         validators=[validators.validate_selector_syntax])
     next_chapter_opened = models.BooleanField(_("Next chapter opened"), default=False)
 
+    chapter_images_selector = models.CharField(_("Chapter images selector"), max_length=255, blank=True,
+        validators=[validators.validate_selector_syntax])
+    chapter_image_attribute = models.CharField(_("Chapter image attribute"), max_length=255, blank=True,
+        default='src')
+
     is_template = models.BooleanField(_("Is template"), default=False)
 
     class Meta:
