@@ -76,7 +76,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         return render_to_string('djmanhwabookmarks/bookmark_actions.html', context)
 
     @admin.action(description=_('Update bookmarks'))
-    def update_bookmarks(self, request, queryset):
+    def update_bookmarks(self, request, queryset: models.ManhwaBookmarkQueryset):
         queryset.update_bookmarks()
         self.message_user(request, gettext('Bookmarks updated'))
 
