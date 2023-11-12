@@ -30,7 +30,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url', 'priority', 'get_updated_at')
     fieldsets = (
         (None, {
-            'fields': ('name',)
+            'fields': ('name', 'extractor_type')
         }),
         (_('Main info'), {
             'fields': ('url', 'url_selector', 'title', 'title_selector', 'description', 'description_selector')
