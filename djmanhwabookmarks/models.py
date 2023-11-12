@@ -15,9 +15,11 @@ from . import validators
 
 class ManhwaBookmarkQueryset(models.QuerySet['ManhwaBookmark']):
     def update_bookmarks(self) -> None:
-        count = self.count()
+        # process only bookmarks with no next chapter url
+        queryset = self.filter(next_chapter_url__isnull=True)
+        count = queryset.count()
         with ThreadPoolExecutor(10) as executor:
-            futures = (executor.submit(bookmark.update_bookmark) for bookmark in self.all())
+            futures = (executor.submit(bookmark.update_bookmark) for bookmark in queryset)
             for pos, future in enumerate(as_completed(futures)):  # noqa: B007
                 print(f'{pos + 1}/{count}')
 
