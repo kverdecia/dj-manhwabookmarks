@@ -68,6 +68,9 @@ class ManhwaBookmark(models.Model):
 
     is_template = models.BooleanField(_("Is template"), default=False)
 
+    priority = models.PositiveIntegerField(_("Priority"), default=0, editable=False)
+    priority_multiplier = models.PositiveIntegerField(_("Priority multiplier"), default=1)
+
     class Meta:
         verbose_name = _("Manhwa bookmark")
         verbose_name_plural = _("Manhwa bookmarks")
@@ -78,6 +81,7 @@ class ManhwaBookmark(models.Model):
     def save(self, *args, **kwargs):
         if self.pk is None and not self.is_template:
             self.copy_template_fields_if_empty()
+        self.priority = 0 if self.next_chapter_url is None else self.priority_multiplier
         super().save(*args, **kwargs)
 
     def copy_template_fields_if_empty(self):
