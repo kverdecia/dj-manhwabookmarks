@@ -17,6 +17,9 @@ from . import forms
 @admin.register(models.ManhwaBookmark)
 class ManhwaBookmarkAdmin(admin.ModelAdmin):
     class Media:
+        css = {
+            "all": ["css/djmanhwabookmarks/manhwa-reader.css"],
+        }
         js = [
             'https://unpkg.com/htmx.org@1.9.5',
             'js/djmanhwabookmarks.js',
@@ -37,6 +40,9 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         }),
         (_('Next chapter'), {
             'fields': ('next_chapter_url', 'next_chapter_url_selector', 'next_chapter_opened')
+        }),
+        (_('Reader'), {
+            'fields': ('chapter_images_selector', 'chapter_image_attribute',)
         }),
         (_('Template'), {
             'fields': ('is_template',)
