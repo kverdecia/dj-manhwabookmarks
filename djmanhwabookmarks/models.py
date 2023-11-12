@@ -102,11 +102,26 @@ class ManhwaBookmark(models.Model):
         template_url = parse_result.geturl()
         return ManhwaBookmark.objects.filter(chapter_url__startswith=template_url, is_template=True).first()
 
+    def is_modified_for_update(self):
+        if self.pk is None:
+            return True
+        old = ManhwaBookmark.objects.get(pk=self.pk)
+        return (
+            self.url != old.url or  # noqa: W504
+            self.title != old.title or  # noqa: W504
+            self.description != old.description or  # noqa: W504
+            self.chapter_url != old.chapter_url or  # noqa: W504
+            self.chapter_number != old.chapter_number or  # noqa: W504
+            self.next_chapter_url != old.next_chapter_url  # noqa: W504
+        )
+
     def update_bookmark(self, save=True):
         self.update_chapter()
         self.update_bookmark_url()
         self.update_main_page()
-        if save:
+        can_modify = save and self.is_modified_for_update()
+        print(f"Modifying bookmark {self.pk}:'{self.title or self.name}': {can_modify}")
+        if can_modify:
             self.save()
 
     def open_chapter(self) -> mechanicalsoup.StatefulBrowser:
