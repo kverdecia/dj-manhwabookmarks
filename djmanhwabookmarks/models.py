@@ -71,9 +71,12 @@ class ManhwaBookmark(models.Model):
     priority = models.PositiveIntegerField(_("Priority"), default=0, editable=False)
     priority_multiplier = models.PositiveIntegerField(_("Priority multiplier"), default=1)
 
+    updated_at = models.DateTimeField(_("Updated at"), auto_now=True)
+
     class Meta:
         verbose_name = _("Manhwa bookmark")
         verbose_name_plural = _("Manhwa bookmarks")
+        ordering = ('-priority', '-updated_at')
 
     def __str__(self):
         return self.title or self.name

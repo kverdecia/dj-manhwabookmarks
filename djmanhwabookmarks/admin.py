@@ -26,8 +26,8 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         ]
 
     actions = ('update_bookmarks',)
-    list_display = ('get_name', 'get_url', 'get_chapter_number', 'is_template', 'get_next_chapter', 'priority')
-    readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url', 'priority')
+    list_display = ('get_name', 'get_url', 'get_chapter_number', 'is_template', 'get_next_chapter', 'priority', 'priority_multiplier', 'get_updated_at')
+    readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url', 'priority', 'get_updated_at')
     fieldsets = (
         (None, {
             'fields': ('name',)
@@ -49,6 +49,9 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         }),
         (_('Priority'), {
             'fields': ('priority', 'priority_multiplier')
+        }),
+        (_('Dates'), {
+            'fields': ('get_updated_at',)
         }),
     )
     form = forms.BookmarkForm
@@ -77,6 +80,12 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
     def get_next_chapter(self, obj: models.ManhwaBookmark) -> str | None:
         context = {'bookmark': obj}
         return render_to_string('djmanhwabookmarks/bookmark_actions.html', context)
+
+    @admin.display(description=_('Updated'), ordering='updated_at')
+    def get_updated_at(self, obj: models.ManhwaBookmark) -> str | None:
+        if not obj.updated_at:
+            return None
+        return obj.updated_at.strftime('%Y-%m-%d %H:%M:%S')
 
     @admin.action(description=_('Update bookmarks'))
     def update_bookmarks(self, request, queryset: models.ManhwaBookmarkQueryset):
