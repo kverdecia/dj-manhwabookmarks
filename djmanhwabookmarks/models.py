@@ -132,7 +132,7 @@ class ManhwaBookmark(models.Model):
         )
 
     def get_extractor_class(self) -> type[extractors.Extractor]:
-        return extractors.MechanicalSoupExtractor
+        return extractors.SimpleExtractor
 
     def get_extractor_backend(self) -> extractors.ExtractorBackend:
         extractor_type = ExtractorType(self.extractor_type)
