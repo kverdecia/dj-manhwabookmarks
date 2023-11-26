@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Optional
+from typing import Optional, Self
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -13,11 +13,15 @@ class ManhwaBookmarkQueryset(models.QuerySet['ManhwaBookmark']):
     def update_bookmarks(self) -> None:
         # process only bookmarks with no next chapter url
         queryset = self.filter(next_chapter_url__isnull=True)
+        processing_pks = set(queryset.values_list('pk', flat=True))
         count = queryset.count()
         with ThreadPoolExecutor(10) as executor:
             futures = (executor.submit(bookmark.update_bookmark) for bookmark in queryset)
             for pos, future in enumerate(as_completed(futures)):  # noqa: B007
                 print(f'{pos + 1}/{count}')
+                processed_bookmark = future.result()
+                processing_pks.remove(processed_bookmark.pk)
+                print(f'Bookmarks processing: {processing_pks}')
 
 
 class ManhwaBookmarkManager(models.Manager):
@@ -143,7 +147,7 @@ class ManhwaBookmark(models.Model):
         )
         return extractor_class(params)
 
-    def update_bookmark(self, save=True):
+    def update_bookmark(self, save=True) -> Self:
         extractor = self.get_extractor_instance()
         extractor_result = extractor()
         self.url = extractor_result.url
@@ -155,6 +159,7 @@ class ManhwaBookmark(models.Model):
         print(f"Modifying bookmark {self.pk}:'{self.title or self.name}': {can_modify}")
         if can_modify:
             self.save()
+        return self
 
     def mark_next_chapter_opened(self):
         if self.next_chapter_url:
