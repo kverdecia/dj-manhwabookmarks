@@ -33,8 +33,23 @@ class ExtractorResult:
     next_chapter_url: str | None = None
 
 
+class ExtractorBackend(Protocol):
+    @staticmethod
+    def validate_selector_syntax(value: str):
+        ...
+
+    def open(self, url: str) -> None:
+        ...
+
+    def get_text_content(self, selector: str) -> str | None:
+        ...
+
+    def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
+        ...
+
+
 class Extractor(Protocol):
-    def __init__(self, params: ExtractorParams):
+    def __init__(self, backend: ExtractorBackend, params: ExtractorParams):
         ...
 
     def __call__(self) -> ExtractorResult:
@@ -44,13 +59,76 @@ class Extractor(Protocol):
         ...
 
 
-class ValidatorsMixin:
+# class ValidatorsMixin:
+#     @staticmethod
+#     def validate_selector_syntax(value: str):
+#         try:
+#             soupsieve.compile(value)
+#         except soupsieve.util.SelectorSyntaxError:
+#             raise ValidationError(_("Invalid css selector syntax."))
+
+#     @staticmethod
+#     def validate_regex_syntax(value: str):
+#         try:
+#             re.compile(value)
+#         except re.error:
+#             raise ValidationError(_("Invalid regular expression syntax."))
+
+
+class MechanicalSoupExtractorBackend:
+    browser: mechanicalsoup.StatefulBrowser
+    page: bs4.BeautifulSoup | None
+
+    def __init__(self):
+        self.browser = mechanicalsoup.StatefulBrowser()
+        self.page = None
+
+    def open(self, url: str) -> None:
+        self.browser.open(url)
+        self.page = cast(bs4.BeautifulSoup, self.browser.page)
+
+    def _get_selector_tag(self, selector: str | None) -> bs4.Tag | None:
+        if not selector or not self.page:
+            return None
+        tag = self.page.select_one(selector)
+        if not tag:
+            return None
+        return tag
+
+    def get_text_content(self, selector: str) -> str | None:
+        tag = self._get_selector_tag(selector)
+        if tag is None:
+            return None
+        return tag.get_text().strip()
+
+    def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
+        tag = self._get_selector_tag(selector)
+        if tag is None:
+            return None
+        if required_tag and tag.name != required_tag:
+            return None
+        result = tag.get(attribute, None)
+        if result is None:
+            return None
+        if isinstance(result, str):
+            return result
+        return result[0]
+
     @staticmethod
     def validate_selector_syntax(value: str):
         try:
             soupsieve.compile(value)
         except soupsieve.util.SelectorSyntaxError:
             raise ValidationError(_("Invalid css selector syntax."))
+
+
+class MechanicalSoupExtractor:
+    params: ExtractorParams
+    backend: ExtractorBackend
+
+    def __init__(self, backend: ExtractorBackend, params: ExtractorParams):
+        self.params = params
+        self.backend = backend
 
     @staticmethod
     def validate_regex_syntax(value: str):
@@ -59,60 +137,58 @@ class ValidatorsMixin:
         except re.error:
             raise ValidationError(_("Invalid regular expression syntax."))
 
+    def validate_params(self) -> None:
+        errors = {}
+        try:
+            self.backend.validate_selector_syntax(self.params.chapter_number_selector)
+        except ValidationError as e:
+            errors['chapter_number_selector'] = e
+        try:
+            self.backend.validate_selector_syntax(self.params.next_chapter_url_selector)
+        except ValidationError as e:
+            errors['next_chapter_url_selector'] = e
+        try:
+            self.backend.validate_selector_syntax(self.params.url_selector)
+        except ValidationError as e:
+            errors['url_selector'] = e
+        try:
+            self.backend.validate_selector_syntax(self.params.title_selector)
+        except ValidationError as e:
+            errors['title_selector'] = e
+        try:
+            self.backend.validate_selector_syntax(self.params.description_selector)
+        except ValidationError as e:
+            errors['description_selector'] = e
+        try:
+            self.validate_regex_syntax(self.params.chapter_number_regex)
+        except ValidationError as e:
+            errors['chapter_number_regex'] = e
+        if errors:
+            raise ValidationError(errors)
 
-class MechanicalSoupExtractor(ValidatorsMixin):
-    params: ExtractorParams
+    def open_chapter(self) -> None:
+        self.backend.open(self.params.chapter_url)
 
-    def __init__(self, params: ExtractorParams):
-        self.params = params
-
-    def open_main_page(self, url: str | None) -> mechanicalsoup.StatefulBrowser | None:
+    def open_main_page(self, url: str | None) -> None:
         if not url:
             return None
-        browser = mechanicalsoup.StatefulBrowser()
-        browser.open(url)
-        return browser
+        self.backend.open(url)
 
-    def open_chapter(self) -> mechanicalsoup.StatefulBrowser:
-        browser = mechanicalsoup.StatefulBrowser()
-        browser.open(self.params.chapter_url)
-        return browser
+    def _get_selector_content(self, selector: str) -> str | None:
+        return self.backend.get_text_content(selector)
 
-    def _get_page(self, browser: mechanicalsoup.StatefulBrowser) -> bs4.BeautifulSoup:
-        return cast(bs4.BeautifulSoup, browser.page)
-
-    def _get_selector_tag(self, page: bs4.BeautifulSoup, selector: str | None) -> bs4.Tag | None:
-        if not selector:
-            return None
-        tag = page.select_one(selector)
-        if not tag:
-            return None
-        return tag
-
-    def _get_selector_content(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
-        tag = self._get_selector_tag(page, selector)
-        if not tag:
-            return None
-        return tag.get_text().strip()
-
-    def _get_selector_link(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
+    def _get_selector_link(self, selector: str) -> str | None:
         def absolute_url(url: str) -> str:
             if url.startswith('/'):
                 return urljoin(self.params.chapter_url, url)
             return url
-
-        tag = self._get_selector_tag(page, selector)
-        if not tag:
+        result = self.backend.get_attribute(selector, 'href', required_tag='a')
+        if result is None:
             return None
-        if tag.name != "a":
-            return None
-        result = tag['href']
-        if isinstance(result, str):
-            return absolute_url(result)
-        return absolute_url(result[0])
+        return absolute_url(result)
 
-    def _get_chapter_number(self, page: bs4.BeautifulSoup) -> float | None:
-        number_str = self._get_selector_content(page, self.params.chapter_number_selector)
+    def _get_chapter_number(self) -> float | None:
+        number_str = self.backend.get_text_content(self.params.chapter_number_selector)
         if not number_str:
             return None
         try:
@@ -127,52 +203,20 @@ class MechanicalSoupExtractor(ValidatorsMixin):
         return float(found[0])
 
     def update_chapter(self, result: ExtractorResult) -> None:
-        browser = self.open_chapter()
-        page = self._get_page(browser)
-        result.chapter_number = self._get_chapter_number(page)
-        result.next_chapter_url = self._get_selector_link(page, self.params.next_chapter_url_selector)
+        self.open_chapter()
+        result.chapter_number = self._get_chapter_number()
+        result.next_chapter_url = self._get_selector_link(self.params.next_chapter_url_selector)
 
     def update_bookmark_url(self, result: ExtractorResult):
-        browser = self.open_chapter()
-        page = self._get_page(browser)
-        result.url = self._get_selector_link(page, self.params.url_selector)
+        self.open_chapter()
+        result.url = self._get_selector_link(self.params.url_selector)
 
     def update_main_page(self, result: ExtractorResult):
         browser = self.open_main_page(result.url)
         if browser is None:
             return
-        page = self._get_page(browser)
-        result.title = self._get_selector_content(page, self.params.title_selector) or ''
-        result.description = self._get_selector_content(page, self.params.description_selector) or ''
-
-    def validate_params(self) -> None:
-        errors = {}
-        try:
-            self.validate_selector_syntax(self.params.chapter_number_selector)
-        except ValidationError as e:
-            errors['chapter_number_selector'] = e
-        try:
-            self.validate_selector_syntax(self.params.next_chapter_url_selector)
-        except ValidationError as e:
-            errors['next_chapter_url_selector'] = e
-        try:
-            self.validate_selector_syntax(self.params.url_selector)
-        except ValidationError as e:
-            errors['url_selector'] = e
-        try:
-            self.validate_selector_syntax(self.params.title_selector)
-        except ValidationError as e:
-            errors['title_selector'] = e
-        try:
-            self.validate_selector_syntax(self.params.description_selector)
-        except ValidationError as e:
-            errors['description_selector'] = e
-        try:
-            self.validate_regex_syntax(self.params.chapter_number_regex)
-        except ValidationError as e:
-            errors['chapter_number_regex'] = e
-        if errors:
-            raise ValidationError(errors)
+        result.title = self._get_selector_content(self.params.title_selector) or ''
+        result.description = self._get_selector_content(self.params.description_selector) or ''
 
     def __call__(self) -> ExtractorResult:
         result = ExtractorResult()
