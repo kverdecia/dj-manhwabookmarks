@@ -1,9 +1,11 @@
 from typing import cast, Protocol, Iterator
+import time
 import re
 from urllib.parse import urljoin
 from dataclasses import dataclass
 from lxml import etree, html
 from contextlib import contextmanager
+from playwright.sync_api import Page, sync_playwright, Locator
 
 import bs4
 import mechanicalsoup
@@ -133,6 +135,55 @@ class MechanicalSoupExtractorBackend:
         yield self
 
 
+class PlayWrightExtractorBackend:
+    page: Page | None
+
+    def __init__(self):
+        self.page = None
+
+    def open(self, url: str) -> None:
+        if self.page is None:
+            return None
+        self.page.goto(url)
+        time.sleep(2)
+
+    def _get_selector_tag(self, selector: str | None) -> Locator | None:
+        "Returns the first tag from the locator obtained from the selector parameter. If locator is empty returns None."
+        if not selector or not self.page:
+            return None
+        locator = self.page.locator(selector)
+        if locator.count() == 0:
+            return None
+        return locator.first
+
+    def get_text_content(self, selector: str) -> str | None:
+        tag = self._get_selector_tag(selector)
+        if tag is None:
+            return None
+        return (tag.text_content() or '').strip()
+
+    def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
+        locator = self._get_selector_tag(selector)
+        if locator is None:
+            return None
+        if required_tag:
+            tag_name = locator.evaluate("element => element.tagName")
+            if not tag_name or tag_name.lower() != required_tag.lower():
+                return None
+        return locator.get_attribute(attribute)
+
+    @staticmethod
+    def validate_selector_syntax(value: str):
+        ...
+
+    @contextmanager
+    def context(self) -> Iterator['ExtractorBackend']:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            self.page = browser.new_page()
+            yield self
+
+
 class LXmlXpathExtractorBackend:
     page_content: str | None
     xml: etree._Element | None
@@ -259,7 +310,7 @@ class SimpleExtractor:
         result.next_chapter_url = self._get_selector_link(self.params.next_chapter_url_selector)
 
     def update_bookmark_url(self, result: ExtractorResult) -> None:
-        self.backend.open(self.params.chapter_url)
+        # self.backend.open(self.params.chapter_url)
         result.url = self._get_selector_link(self.params.url_selector)
 
     def update_main_page(self, result: ExtractorResult) -> None:

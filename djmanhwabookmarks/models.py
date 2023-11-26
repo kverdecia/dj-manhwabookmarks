@@ -34,10 +34,12 @@ class ManhwaBookmarkManager(models.Manager):
 
 class ExtractorType(models.TextChoices):
     MECHANICAL_SOUP = 'mechanical_soup', _("MechanicalSoup")
+    PLAYWRIGHT = 'playwright', _("Playwright")
 
 
 EXTRACTOR_BACKEND_TYPES = {
     ExtractorType.MECHANICAL_SOUP: extractors.MechanicalSoupExtractorBackend,
+    ExtractorType.PLAYWRIGHT: extractors.PlayWrightExtractorBackend,
 }
 
 
@@ -161,7 +163,8 @@ class ManhwaBookmark(models.Model):
         self.description = extractor_result.description
         self.chapter_number = extractor_result.chapter_number
         self.next_chapter_url = extractor_result.next_chapter_url
-        can_modify = save and self.is_modified_for_update()
+        is_modified = self.is_modified_for_update()
+        can_modify = save and is_modified
         print(f"Modifying bookmark {self.pk}:'{self.title or self.name}': {can_modify}")
         if can_modify:
             self.save()
