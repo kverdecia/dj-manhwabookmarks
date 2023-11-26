@@ -1,11 +1,14 @@
-from typing import cast, Protocol
+from typing import cast, Protocol, Iterator
 import re
 from urllib.parse import urljoin
 from dataclasses import dataclass
+from lxml import etree, html
+from contextlib import contextmanager
 
 import bs4
 import mechanicalsoup
 import soupsieve
+import requests
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -45,6 +48,10 @@ class ExtractorBackend(Protocol):
         ...
 
     def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
+        ...
+
+    @contextmanager
+    def context(self) -> Iterator['ExtractorBackend']:
         ...
 
 
@@ -121,8 +128,60 @@ class MechanicalSoupExtractorBackend:
         except soupsieve.util.SelectorSyntaxError:
             raise ValidationError(_("Invalid css selector syntax."))
 
+    @contextmanager
+    def context(self) -> Iterator['ExtractorBackend']:
+        yield self
 
-class MechanicalSoupExtractor:
+
+class LXmlXpathExtractorBackend:
+    page_content: str | None
+    xml: etree._Element | None
+
+    def __init__(self):
+        self.page = None
+
+    def open(self, url: str) -> None:
+        response = requests.get(url)
+        response.raise_for_status()
+        self.page_content = response.text
+        self.xml = html.parse(self.page_content)
+
+    def _get_selector_tag(self, selector: str | None) -> bs4.Tag | None:
+        if not selector or not self.page:
+            return None
+        tag = self.page.select_one(selector)
+        if not tag:
+            return None
+        return tag
+
+    def get_text_content(self, selector: str) -> str | None:
+        tag = self._get_selector_tag(selector)
+        if tag is None:
+            return None
+        return tag.get_text().strip()
+
+    def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
+        tag = self._get_selector_tag(selector)
+        if tag is None:
+            return None
+        if required_tag and tag.name != required_tag:
+            return None
+        result = tag.get(attribute, None)
+        if result is None:
+            return None
+        if isinstance(result, str):
+            return result
+        return result[0]
+
+    @staticmethod
+    def validate_selector_syntax(value: str):
+        try:
+            soupsieve.compile(value)
+        except soupsieve.util.SelectorSyntaxError:
+            raise ValidationError(_("Invalid css selector syntax."))
+
+
+class SimpleExtractor:
     params: ExtractorParams
     backend: ExtractorBackend
 
@@ -166,14 +225,6 @@ class MechanicalSoupExtractor:
         if errors:
             raise ValidationError(errors)
 
-    def open_chapter(self) -> None:
-        self.backend.open(self.params.chapter_url)
-
-    def open_main_page(self, url: str | None) -> None:
-        if not url:
-            return None
-        self.backend.open(url)
-
     def _get_selector_content(self, selector: str) -> str | None:
         return self.backend.get_text_content(selector)
 
@@ -203,24 +254,25 @@ class MechanicalSoupExtractor:
         return float(found[0])
 
     def update_chapter(self, result: ExtractorResult) -> None:
-        self.open_chapter()
+        self.backend.open(self.params.chapter_url)
         result.chapter_number = self._get_chapter_number()
         result.next_chapter_url = self._get_selector_link(self.params.next_chapter_url_selector)
 
-    def update_bookmark_url(self, result: ExtractorResult):
-        self.open_chapter()
+    def update_bookmark_url(self, result: ExtractorResult) -> None:
+        self.backend.open(self.params.chapter_url)
         result.url = self._get_selector_link(self.params.url_selector)
 
-    def update_main_page(self, result: ExtractorResult):
-        browser = self.open_main_page(result.url)
-        if browser is None:
+    def update_main_page(self, result: ExtractorResult) -> None:
+        if result.url is None:
             return
+        self.backend.open(result.url)
         result.title = self._get_selector_content(self.params.title_selector) or ''
         result.description = self._get_selector_content(self.params.description_selector) or ''
 
     def __call__(self) -> ExtractorResult:
-        result = ExtractorResult()
-        self.update_chapter(result)
-        self.update_bookmark_url(result)
-        self.update_main_page(result)
-        return result
+        with self.backend.context():
+            result = ExtractorResult()
+            self.update_chapter(result)
+            self.update_bookmark_url(result)
+            self.update_main_page(result)
+            return result
