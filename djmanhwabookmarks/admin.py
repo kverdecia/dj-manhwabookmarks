@@ -26,7 +26,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         ]
 
     actions = ('update_bookmarks',)
-    list_display = ('get_name', 'get_url', 'get_chapter_number', 'is_template', 'get_next_chapter', 'priority', 'priority_multiplier', 'get_updated_at')
+    list_display = ('get_name', 'get_chapter_number', 'is_template', 'bookmark_buttons', 'priority', 'priority_multiplier', 'get_updated_at')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url', 'priority', 'get_updated_at')
     fieldsets = (
         (None, {
@@ -76,8 +76,8 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
             id, obj.chapter_url, obj.chapter_number
         )
 
-    @admin.display(description=_('Next chapter'))
-    def get_next_chapter(self, obj: models.ManhwaBookmark) -> str | None:
+    @admin.display(description=_('Actions'))
+    def bookmark_buttons(self, obj: models.ManhwaBookmark) -> str | None:
         context = {'bookmark': obj}
         return render_to_string('djmanhwabookmarks/bookmark_actions.html', context)
 
