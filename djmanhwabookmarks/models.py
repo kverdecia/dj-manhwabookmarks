@@ -36,8 +36,8 @@ class ExtractorType(models.TextChoices):
     MECHANICAL_SOUP = 'mechanical_soup', _("MechanicalSoup")
 
 
-EXTRACTOR_TYPES = {
-    ExtractorType.MECHANICAL_SOUP: extractors.MechanicalSoupExtractor,
+EXTRACTOR_BACKEND_TYPES = {
+    ExtractorType.MECHANICAL_SOUP: extractors.MechanicalSoupExtractorBackend,
 }
 
 
@@ -132,7 +132,12 @@ class ManhwaBookmark(models.Model):
         )
 
     def get_extractor_class(self) -> type[extractors.Extractor]:
-        return EXTRACTOR_TYPES[ExtractorType(self.extractor_type)]
+        return extractors.MechanicalSoupExtractor
+
+    def get_extractor_backend(self) -> extractors.ExtractorBackend:
+        extractor_type = ExtractorType(self.extractor_type)
+        backend_class = EXTRACTOR_BACKEND_TYPES[extractor_type]
+        return backend_class()
 
     def get_extractor_instance(self) -> extractors.Extractor:
         extractor_class = self.get_extractor_class()
@@ -145,7 +150,8 @@ class ManhwaBookmark(models.Model):
             title_selector=self.title_selector,
             description_selector=self.description_selector,
         )
-        return extractor_class(params)
+        backend = self.get_extractor_backend()
+        return extractor_class(backend, params)
 
     def update_bookmark(self, save=True) -> Self:
         extractor = self.get_extractor_instance()
