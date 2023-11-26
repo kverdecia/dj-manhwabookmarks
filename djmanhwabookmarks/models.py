@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
-from typing import cast, Optional, Self
-import re
-from urllib.parse import urljoin, urlparse
+from typing import Optional, Self
+from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.utils.translation import gettext_lazy as _
 from django.db import models
 
-import bs4
-import mechanicalsoup
-
-from . import validators
+from . import extractors
 
 
 class ManhwaBookmarkQueryset(models.QuerySet['ManhwaBookmark']):
@@ -36,37 +32,42 @@ class ManhwaBookmarkManager(models.Manager):
         return self.get_queryset().update_bookmarks()
 
 
+class ExtractorType(models.TextChoices):
+    MECHANICAL_SOUP = 'mechanical_soup', _("MechanicalSoup")
+
+
+EXTRACTOR_TYPES = {
+    ExtractorType.MECHANICAL_SOUP: extractors.MechanicalSoupExtractor,
+}
+
+
 class ManhwaBookmark(models.Model):
     objects = ManhwaBookmarkManager()
+
+    extractor_type = models.CharField(_("Extractor type"), max_length=100, choices=ExtractorType.choices,
+        default=ExtractorType.MECHANICAL_SOUP)
 
     name = models.CharField(_("Name"), max_length=255, unique=True)
 
     url = models.URLField(_("Url"), max_length=1000, blank=True, null=True, unique=True, editable=False)
-    url_selector = models.CharField(max_length=255, blank=True,
-        validators=[validators.validate_selector_syntax])
+    url_selector = models.CharField(max_length=255, blank=True)
 
     title = models.CharField(_("Title"), max_length=255, blank=True, editable=False)
-    title_selector = models.CharField(max_length=255, blank=True,
-        validators=[validators.validate_selector_syntax])
+    title_selector = models.CharField(max_length=255, blank=True)
 
     description = models.TextField(_("Description"), blank=True, editable=False)
-    description_selector = models.CharField(max_length=255, blank=True,
-        validators=[validators.validate_selector_syntax])
+    description_selector = models.CharField(max_length=255, blank=True)
 
     chapter_url = models.URLField(_("Chapter url"), max_length=1000, unique=True)
     chapter_number = models.FloatField(_("Chapter number"), blank=True, null=True, editable=False)
-    chapter_number_selector = models.CharField(max_length=255, blank=True,
-        validators=[validators.validate_selector_syntax])
-    chapter_number_regex = models.CharField(max_length=255, blank=True,
-        validators=[validators.validate_regex_syntax])
+    chapter_number_selector = models.CharField(max_length=255, blank=True)
+    chapter_number_regex = models.CharField(max_length=255, blank=True)
 
     next_chapter_url = models.URLField(_("Next chapter url"), max_length=1000, blank=True, null=True, unique=True, editable=False)
-    next_chapter_url_selector = models.CharField(max_length=255, blank=True,
-        validators=[validators.validate_selector_syntax])
+    next_chapter_url_selector = models.CharField(max_length=255, blank=True)
     next_chapter_opened = models.BooleanField(_("Next chapter opened"), default=False)
 
-    chapter_images_selector = models.CharField(_("Chapter images selector"), max_length=255, blank=True,
-        validators=[validators.validate_selector_syntax])
+    chapter_images_selector = models.CharField(_("Chapter images selector"), max_length=255, blank=True)
     chapter_image_attribute = models.CharField(_("Chapter image attribute"), max_length=255, blank=True,
         default='src')
 
@@ -84,6 +85,10 @@ class ManhwaBookmark(models.Model):
 
     def __str__(self):
         return self.title or self.name
+
+    def clean(self):
+        extractor = self.get_extractor_instance()
+        extractor.validate_params()
 
     def save(self, *args, **kwargs):
         if self.pk is None and not self.is_template:
@@ -126,94 +131,35 @@ class ManhwaBookmark(models.Model):
             self.next_chapter_url != old.next_chapter_url  # noqa: W504
         )
 
+    def get_extractor_class(self) -> type[extractors.Extractor]:
+        return EXTRACTOR_TYPES[ExtractorType(self.extractor_type)]
+
+    def get_extractor_instance(self) -> extractors.Extractor:
+        extractor_class = self.get_extractor_class()
+        params = extractors.ExtractorParams(
+            chapter_url=self.chapter_url,
+            chapter_number_selector=self.chapter_number_selector,
+            chapter_number_regex=self.chapter_number_regex,
+            next_chapter_url_selector=self.next_chapter_url_selector,
+            url_selector=self.url_selector,
+            title_selector=self.title_selector,
+            description_selector=self.description_selector,
+        )
+        return extractor_class(params)
+
     def update_bookmark(self, save=True) -> Self:
-        self.update_chapter()
-        self.update_bookmark_url()
-        self.update_main_page()
+        extractor = self.get_extractor_instance()
+        extractor_result = extractor()
+        self.url = extractor_result.url
+        self.title = extractor_result.title
+        self.description = extractor_result.description
+        self.chapter_number = extractor_result.chapter_number
+        self.next_chapter_url = extractor_result.next_chapter_url
         can_modify = save and self.is_modified_for_update()
         print(f"Modifying bookmark {self.pk}:'{self.title or self.name}': {can_modify}")
         if can_modify:
             self.save()
         return self
-
-    def open_chapter(self) -> mechanicalsoup.StatefulBrowser:
-        browser = mechanicalsoup.StatefulBrowser()
-        browser.open(self.chapter_url)
-        return browser
-
-    def open_main_page(self) -> mechanicalsoup.StatefulBrowser | None:
-        if not self.url:
-            return None
-        browser = mechanicalsoup.StatefulBrowser()
-        browser.open(self.url)
-        return browser
-
-    def _get_page(self, browser: mechanicalsoup.StatefulBrowser) -> bs4.BeautifulSoup:
-        return cast(bs4.BeautifulSoup, browser.page)
-
-    def _get_selector_tag(self, page: bs4.BeautifulSoup, selector: str | None) -> bs4.Tag | None:
-        if not selector:
-            return None
-        tag = page.select_one(selector)
-        if not tag:
-            return None
-        return tag
-
-    def _get_selector_content(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
-        tag = self._get_selector_tag(page, selector)
-        if not tag:
-            return None
-        return tag.get_text().strip()
-
-    def _get_selector_link(self, page: bs4.BeautifulSoup, selector: str) -> str | None:
-        def absolute_url(url: str) -> str:
-            if url.startswith('/'):
-                return urljoin(self.chapter_url, url)
-            return url
-
-        tag = self._get_selector_tag(page, selector)
-        if not tag:
-            return None
-        if tag.name != "a":
-            return None
-        result = tag['href']
-        if isinstance(result, str):
-            return absolute_url(result)
-        return absolute_url(result[0])
-
-    def _get_chapter_number(self, page: bs4.BeautifulSoup) -> float | None:
-        number_str = self._get_selector_content(page, self.chapter_number_selector)
-        if not number_str:
-            return None
-        try:
-            return float(number_str)
-        except ValueError:
-            ...
-        if not self.chapter_number_regex:
-            return None
-        found = re.findall(self.chapter_number_regex, number_str)
-        if not found:
-            return None
-        return float(found[0])
-
-    def update_chapter(self):
-        browser = self.open_chapter()
-        page = self._get_page(browser)
-        self.chapter_number = self._get_chapter_number(page)
-        self.next_chapter_url = self._get_selector_link(page, self.next_chapter_url_selector)
-
-    def update_bookmark_url(self):
-        browser = self.open_chapter()
-        page = self._get_page(browser)
-        self.url = self._get_selector_link(page, self.url_selector)
-
-    def update_main_page(self):
-        browser = self.open_main_page()
-        if browser is None:
-            return
-        page = self._get_page(browser)
-        self.title = self._get_selector_content(page, self.title_selector) or ''
-        self.description = self._get_selector_content(page, self.description_selector) or ''
 
     def mark_next_chapter_opened(self):
         if self.next_chapter_url:
