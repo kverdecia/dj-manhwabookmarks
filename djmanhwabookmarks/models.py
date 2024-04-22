@@ -156,19 +156,23 @@ class ManhwaBookmark(models.Model):
         return extractor_class(backend, params)
 
     def update_bookmark(self, save=True) -> Self:
-        extractor = self.get_extractor_instance()
-        extractor_result = extractor()
-        self.url = extractor_result.url
-        self.title = extractor_result.title
-        self.description = extractor_result.description
-        self.chapter_number = extractor_result.chapter_number
-        self.next_chapter_url = extractor_result.next_chapter_url
-        is_modified = self.is_modified_for_update()
-        can_modify = save and is_modified
-        print(f"Modifying bookmark {self.pk}:'{self.title or self.name}': {can_modify}")
-        if can_modify:
-            self.save()
-        return self
+        try:
+            extractor = self.get_extractor_instance()
+            extractor_result = extractor()
+            self.url = extractor_result.url
+            self.title = extractor_result.title
+            self.description = extractor_result.description
+            self.chapter_number = extractor_result.chapter_number
+            self.next_chapter_url = extractor_result.next_chapter_url
+            is_modified = self.is_modified_for_update()
+            can_modify = save and is_modified
+            print(f"Modifying bookmark {self.pk}:'{self.title or self.name}': {can_modify}")
+            if can_modify:
+                self.save()
+            return self
+        except Exception as err:
+            print(err)
+            return self
 
     def mark_next_chapter_opened(self):
         if self.next_chapter_url:
