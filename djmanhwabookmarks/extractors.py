@@ -316,9 +316,13 @@ class SimpleExtractor:
     def update_main_page(self, result: ExtractorResult) -> None:
         if result.url is None:
             return
-        self.backend.open(result.url)
-        result.title = self._get_selector_content(self.params.title_selector) or ''
-        result.description = self._get_selector_content(self.params.description_selector) or ''
+        try:
+            self.backend.open(result.url)
+            result.title = self._get_selector_content(self.params.title_selector) or ''
+            result.description = self._get_selector_content(self.params.description_selector) or ''
+        except Exception as err:
+            print(err)
+            raise
 
     def __call__(self) -> ExtractorResult:
         with self.backend.context():
