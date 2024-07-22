@@ -8,6 +8,7 @@ django = ">=4.2"
 mechanicalsoup = "*"
 django-htmx = "*"
 playwright = "*"
+django-allauth = {extras = ["socialaccount", "openid"], version = "*"}
 
 [dev-packages]
 invoke = "*"
