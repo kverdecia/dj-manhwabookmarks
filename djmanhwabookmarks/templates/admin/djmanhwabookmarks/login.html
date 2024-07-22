@@ -1,0 +1,17 @@
+{% extends "admin/login.html" %}
+{% load socialaccount %}
+
+{% block content %}
+
+{{ block.super }}
+
+<br class="clear">
+{% get_providers as socialaccount_providers %}
+{% for provider in socialaccount_providers %}
+<div class="social-links" style="text-align: center; padding-top: 14px;">
+    {% if provider.id != 'openid' %}
+    <a href="{% provider_login_url provider.id next="/admin/" %}">{{ provider.name }}</a>
+    {% endif %}
+</div>
+{% endfor %}
+{% endblock %}
