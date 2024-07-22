@@ -1,4 +1,4 @@
-from typing import cast, Protocol, Iterator
+from typing import cast, Any, Protocol, Iterator
 import time
 import re
 from urllib.parse import urljoin
@@ -23,6 +23,7 @@ class ExtractorParams:
     chapter_number_regex: str
 
     next_chapter_url_selector: str
+    excluded_next_chapter_selector: str
 
     url_selector: str
     title_selector: str
@@ -47,6 +48,9 @@ class ExtractorBackend(Protocol):
         ...
 
     def get_text_content(self, selector: str) -> str | None:
+        ...
+
+    def get_tag(self, selector: str) -> Any | None:
         ...
 
     def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
@@ -110,8 +114,11 @@ class MechanicalSoupExtractorBackend:
             return None
         return tag.get_text().strip()
 
+    def get_tag(self, selector: str):
+        return self._get_selector_tag(selector)
+
     def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
-        tag = self._get_selector_tag(selector)
+        tag = self.get_tag(selector)
         if tag is None:
             return None
         if required_tag and tag.name != required_tag:
@@ -156,8 +163,11 @@ class PlayWrightExtractorBackend:
             return None
         return locator.first
 
+    def get_tag(self, selector: str) -> Any | None:
+        return self._get_selector_tag(selector)
+
     def get_text_content(self, selector: str) -> str | None:
-        tag = self._get_selector_tag(selector)
+        tag = self.get_tag(selector)
         if tag is None:
             return None
         return (tag.text_content() or '').strip()
@@ -211,8 +221,11 @@ class LXmlXpathExtractorBackend:
             return None
         return tag.get_text().strip()
 
+    def get_tag(self, selector: str) -> Any | None:
+        return self._get_selector_tag(selector)
+
     def get_attribute(self, selector: str, attribute: str, required_tag: str | None = None) -> str | None:
-        tag = self._get_selector_tag(selector)
+        tag = self.get_tag(selector)
         if tag is None:
             return None
         if required_tag and tag.name != required_tag:
@@ -307,6 +320,10 @@ class SimpleExtractor:
     def update_chapter(self, result: ExtractorResult) -> None:
         self.backend.open(self.params.chapter_url)
         result.chapter_number = self._get_chapter_number()
+        excluded_selector = self.params.excluded_next_chapter_selector
+        if excluded_selector and self.backend.get_tag(excluded_selector):
+            result.next_chapter_url = None
+            return
         result.next_chapter_url = self._get_selector_link(self.params.next_chapter_url_selector)
 
     def update_bookmark_url(self, result: ExtractorResult) -> None:

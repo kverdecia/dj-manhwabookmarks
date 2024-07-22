@@ -39,7 +39,10 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
             'fields': ('chapter_url', 'chapter_number', 'chapter_number_selector', 'chapter_number_regex')
         }),
         (_('Next chapter'), {
-            'fields': ('next_chapter_url', 'next_chapter_url_selector', 'next_chapter_opened')
+            'fields': (
+                'next_chapter_url', 'next_chapter_url_selector', 'next_chapter_opened',
+                'excluded_next_chapter_selector'
+            )
         }),
         (_('Reader'), {
             'fields': ('chapter_images_selector', 'chapter_image_attribute',)

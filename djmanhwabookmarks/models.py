@@ -19,8 +19,11 @@ class ManhwaBookmarkQueryset(models.QuerySet['ManhwaBookmark']):
             futures = (executor.submit(bookmark.update_bookmark) for bookmark in queryset)
             for pos, future in enumerate(as_completed(futures)):  # noqa: B007
                 print(f'{pos + 1}/{count}')
-                processed_bookmark = future.result()
-                processing_pks.remove(processed_bookmark.pk)
+                try:
+                    processed_bookmark = future.result()
+                    processing_pks.remove(processed_bookmark.pk)
+                except Exception:
+                    ...
                 print(f'Bookmarks processing: {processing_pks}')
 
 
@@ -66,8 +69,9 @@ class ManhwaBookmark(models.Model):
     chapter_number_regex = models.CharField(max_length=255, blank=True)
 
     next_chapter_url = models.URLField(_("Next chapter url"), max_length=1000, blank=True, null=True, unique=True, editable=False)
-    next_chapter_url_selector = models.CharField(max_length=255, blank=True)
+    next_chapter_url_selector = models.CharField(_("Next chapter url"), max_length=255, blank=True)
     next_chapter_opened = models.BooleanField(_("Next chapter opened"), default=False)
+    excluded_next_chapter_selector = models.CharField(_("Excluded next chapter selector"), max_length=255, blank=True)
 
     chapter_images_selector = models.CharField(_("Chapter images selector"), max_length=255, blank=True)
     chapter_image_attribute = models.CharField(_("Chapter image attribute"), max_length=255, blank=True,
@@ -148,6 +152,7 @@ class ManhwaBookmark(models.Model):
             chapter_number_selector=self.chapter_number_selector,
             chapter_number_regex=self.chapter_number_regex,
             next_chapter_url_selector=self.next_chapter_url_selector,
+            excluded_next_chapter_selector=self.excluded_next_chapter_selector,
             url_selector=self.url_selector,
             title_selector=self.title_selector,
             description_selector=self.description_selector,
