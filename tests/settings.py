@@ -31,12 +31,6 @@ INSTALLED_APPS = [
 
     'django_htmx',
 
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.openid',
-    'allauth.socialaccount.providers.openid_connect',
-
     'djmanhwabookmarks',
 
     'django.contrib.admin',
@@ -54,8 +48,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-
-    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = 'tests.urls'
@@ -74,11 +66,6 @@ TEMPLATES = [
             ],
         },
     },
-]
-
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-    'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
 WSGI_APPLICATION = 'tests.wsgi.application'
