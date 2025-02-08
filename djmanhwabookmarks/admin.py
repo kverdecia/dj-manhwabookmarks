@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from typing import ClassVar
 from django.urls import path
 from django.utils.translation import gettext_lazy as _, gettext
 from django.shortcuts import get_object_or_404, render
@@ -17,10 +18,10 @@ from . import forms
 @admin.register(models.ManhwaBookmark)
 class ManhwaBookmarkAdmin(admin.ModelAdmin):
     class Media:
-        css = {
+        css: ClassVar[dict[str, list[str]]] = {
             "all": ["css/djmanhwabookmarks/manhwa-reader.css"],
         }
-        js = [
+        js: ClassVar[list[str]] = [
             'https://unpkg.com/htmx.org@1.9.5',
             'js/djmanhwabookmarks.js',
         ]
@@ -67,7 +68,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
     def get_url(self, obj: models.ManhwaBookmark) -> str | None:
         if not obj.url:
             return None
-        return mark_safe(f'<a href="{obj.url}" target="__blank">{obj.url}</a>')
+        return mark_safe(f'<a href="{obj.url}" target="__blank">{obj.url}</a>')  # noqa: S308
 
     @admin.display(description=_('Chapter'))
     def get_chapter_number(self, obj: models.ManhwaBookmark) -> str | None:

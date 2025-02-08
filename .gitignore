@@ -24,7 +24,6 @@ pip-log.txt
 
 # Unit test / coverage reports
 .coverage
-.tox
 nosetests.xml
 htmlcov
 
@@ -46,5 +45,8 @@ output/*/index.html
 # Sphinx
 docs/_build
 localsettings.py
-.vscode
 db.sqlite3
+.nox
+.venv
+.ruff_cache
+.mypy_cache

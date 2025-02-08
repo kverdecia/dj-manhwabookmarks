@@ -17,7 +17,7 @@ class ManhwaBookmarkQueryset(models.QuerySet['ManhwaBookmark']):
         count = queryset.count()
         with ThreadPoolExecutor(10) as executor:
             futures = (executor.submit(bookmark.update_bookmark) for bookmark in queryset)
-            for pos, future in enumerate(as_completed(futures)):  # noqa: B007
+            for pos, future in enumerate(as_completed(futures)):
                 print(f'{pos + 1}/{count}')
                 try:
                     processed_bookmark = future.result()
@@ -129,12 +129,12 @@ class ManhwaBookmark(models.Model):
             return True
         old = ManhwaBookmark.objects.get(pk=self.pk)
         return (
-            self.url != old.url or  # noqa: W504
-            self.title != old.title or  # noqa: W504
-            self.description != old.description or  # noqa: W504
-            self.chapter_url != old.chapter_url or  # noqa: W504
-            self.chapter_number != old.chapter_number or  # noqa: W504
-            self.next_chapter_url != old.next_chapter_url  # noqa: W504
+            self.url != old.url or
+            self.title != old.title or
+            self.description != old.description or
+            self.chapter_url != old.chapter_url or
+            self.chapter_number != old.chapter_number or
+            self.next_chapter_url != old.next_chapter_url
         )
 
     def get_extractor_class(self) -> type[extractors.Extractor]:
@@ -143,7 +143,7 @@ class ManhwaBookmark(models.Model):
     def get_extractor_backend(self) -> extractors.ExtractorBackend:
         extractor_type = ExtractorType(self.extractor_type)
         backend_class = EXTRACTOR_BACKEND_TYPES[extractor_type]
-        return backend_class()
+        return backend_class()  # type: ignore
 
     def get_extractor_instance(self) -> extractors.Extractor:
         extractor_class = self.get_extractor_class()
