@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from playwright.sync_api import Page, sync_playwright, Locator
 
 import bs4
-import mechanicalsoup
+import mechanicalsoup  # type: ignore[import-untyped]
 import soupsieve
 import requests
 
@@ -134,8 +134,8 @@ class MechanicalSoupExtractorBackend:
     def validate_selector_syntax(value: str):
         try:
             soupsieve.compile(value)
-        except soupsieve.util.SelectorSyntaxError:
-            raise ValidationError(_("Invalid css selector syntax."))
+        except soupsieve.util.SelectorSyntaxError as error:
+            raise ValidationError(_("Invalid css selector syntax.")) from error
 
     @contextmanager
     def context(self) -> Iterator['ExtractorBackend']:
@@ -202,7 +202,7 @@ class LXmlXpathExtractorBackend:
         self.page = None
 
     def open(self, url: str) -> None:
-        response = requests.get(url)
+        response = requests.get(url, timeout=20)
         response.raise_for_status()
         self.page_content = response.text
         self.xml = html.parse(self.page_content)
@@ -241,8 +241,8 @@ class LXmlXpathExtractorBackend:
     def validate_selector_syntax(value: str):
         try:
             soupsieve.compile(value)
-        except soupsieve.util.SelectorSyntaxError:
-            raise ValidationError(_("Invalid css selector syntax."))
+        except soupsieve.util.SelectorSyntaxError as error:
+            raise ValidationError(_("Invalid css selector syntax.")) from error
 
 
 class SimpleExtractor:
@@ -257,8 +257,8 @@ class SimpleExtractor:
     def validate_regex_syntax(value: str):
         try:
             re.compile(value)
-        except re.error:
-            raise ValidationError(_("Invalid regular expression syntax."))
+        except re.error as error:
+            raise ValidationError(_("Invalid regular expression syntax.")) from error
 
     def validate_params(self) -> None:
         errors = {}
