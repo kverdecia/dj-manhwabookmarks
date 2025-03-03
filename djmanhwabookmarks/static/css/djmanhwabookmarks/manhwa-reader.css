@@ -1,3 +1,8 @@
 div#manhwa-reader {
     display: none;
 }
+
+th.field-get_name {
+    width: 700px;
+    max-width: 700px;
+}

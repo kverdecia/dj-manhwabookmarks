@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 from typing import ClassVar
+from urllib.parse import urlparse
+
 from django.urls import path
 from django.utils.translation import gettext_lazy as _, gettext
-from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponse
-from django.contrib import admin
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
+from django.shortcuts import get_object_or_404, render
+from django.http import HttpResponse
 from django.template.loader import render_to_string
+from django.contrib import admin
 
 from django_htmx.http import trigger_client_event
 
@@ -27,7 +29,7 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
         ]
 
     actions = ('update_bookmarks',)
-    list_display = ('get_name', 'get_chapter_number', 'is_template', 'bookmark_buttons', 'priority', 'priority_multiplier', 'get_updated_at')
+    list_display = ('get_name', 'get_website', 'get_chapter_number', 'is_template', 'bookmark_buttons', 'priority', 'get_multiplier', 'get_updated_at')
     readonly_fields = ('url', 'title', 'description', 'chapter_number', 'next_chapter_url', 'priority', 'get_updated_at')
     fieldsets = (
         (None, {
@@ -64,6 +66,17 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
     def get_name(self, obj: models.ManhwaBookmark) -> str:
         return str(obj)
 
+    @admin.display(description=_('Website'))
+    def get_website(self, obj: models.ManhwaBookmark) -> str | None:
+        if not obj.url:
+            return None
+        parsed = urlparse(obj.url)
+        url = f'{parsed.scheme}://{parsed.netloc}'
+        return format_html(
+            '<a href="{}" target="__blank">{}</a>',
+            url, parsed.netloc
+        )
+
     @admin.display(description=_('Url'))
     def get_url(self, obj: models.ManhwaBookmark) -> str | None:
         if not obj.url:
@@ -79,6 +92,10 @@ class ManhwaBookmarkAdmin(admin.ModelAdmin):
             '<a id="{}" href="{}" target="__blank">{}</a>',
             id, obj.chapter_url, obj.chapter_number
         )
+
+    @admin.display(description=_("Multiplier"))
+    def get_multiplier(self, obj: models.ManhwaBookmark) -> int:
+        return obj.priority_multiplier
 
     @admin.display(description=_('Actions'))
     def bookmark_buttons(self, obj: models.ManhwaBookmark) -> str | None:
