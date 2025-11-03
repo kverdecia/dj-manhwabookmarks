@@ -57,7 +57,7 @@ class ManhwaBookmark(models.Model):
     url = models.URLField(_("Url"), max_length=1000, blank=True, null=True, unique=True, editable=False)
     url_selector = models.CharField(max_length=255, blank=True)
 
-    title = models.CharField(_("Title"), max_length=255, blank=True, editable=False)
+    title = models.CharField(_("Title"), max_length=500, blank=True, editable=False)
     title_selector = models.CharField(max_length=255, blank=True)
 
     description = models.TextField(_("Description"), blank=True, editable=False)
