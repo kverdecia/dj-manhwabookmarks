@@ -1,10 +1,12 @@
 {
     "cSpell.words": [
         "djmanhwabookmarks",
+        "justext",
         "nosetests",
         "pycache",
         "pydevproject",
         "sdist",
+        "stoplist",
         "venv"
     ],
     "esbonio.sphinx.confDir": ""
